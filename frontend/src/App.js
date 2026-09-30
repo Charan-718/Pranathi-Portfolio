@@ -149,7 +149,7 @@ function App() {
       const data = await response.json();
 
       if (response.ok && data.success !== false) {
-        showToast('Thank you! Your message has been sent directly to Pranathi. 📬');
+        showToast('Thank you! Your message has been sent directly to Pranathi.');
         setFormData({ name: '', email: '', subject: '', message: '' });
       } else {
         showToast(data.error || 'Failed to deliver message. Please email directly.');
