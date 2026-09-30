@@ -30,6 +30,7 @@ function App() {
 
   // Contact Form State
   const [formData, setFormData] = useState({ name: '', email: '', subject: '', message: '' });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Track Scroll Progress & Active Section (Projects right after Hero)
   useEffect(() => {
@@ -101,14 +102,64 @@ function App() {
     }, 3500);
   };
 
-  const handleFormSubmit = (e) => {
+  const handleFormSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.name || !formData.email || !formData.message) {
+    if (!formData.name.trim() || !formData.email.trim() || !formData.message.trim()) {
       showToast('Please fill in all required fields.');
       return;
     }
-    showToast('Thank you! Your message has been sent successfully.');
-    setFormData({ name: '', email: '', subject: '', message: '' });
+
+    setIsSubmitting(true);
+    try {
+      // Determine endpoint: on production uses /api/contact; locally falls back to local backend port 5001
+      let endpoint = '/api/contact';
+      let response;
+      
+      try {
+        response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData),
+        });
+      } catch (e) {
+        // If relative /api/contact fails in local dev, try local Express port 5001
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+          endpoint = 'http://localhost:5001/api/contact';
+          response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(formData),
+          });
+        } else {
+          throw e;
+        }
+      }
+
+      // If response is HTML (CRA fallback), try localhost:5001
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.includes('application/json') && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+        endpoint = 'http://localhost:5001/api/contact';
+        response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData),
+        });
+      }
+
+      const data = await response.json();
+
+      if (response.ok && data.success !== false) {
+        showToast('Thank you! Your message has been sent directly to Pranathi. 📬');
+        setFormData({ name: '', email: '', subject: '', message: '' });
+      } else {
+        showToast(data.error || 'Failed to deliver message. Please email directly.');
+      }
+    } catch (err) {
+      console.error('Contact form submission error:', err);
+      showToast('Note: Make sure backend server is running, or email directly.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const scrollToSection = (sectionId) => {
@@ -918,7 +969,7 @@ function App() {
                     />
                   </div>
 
-                  <div className="form-group">
+                  <div className="form-group form-group-message">
                     <label className="form-label" htmlFor="message">Message <span className="req">*</span></label>
                     <textarea
                       id="message"
@@ -931,9 +982,18 @@ function App() {
                     ></textarea>
                   </div>
 
-                  <button type="submit" className="btn-primary btn-submit">
-                    <span>Send Message</span>
-                    <i className="fa-solid fa-paper-plane"></i>
+                  <button type="submit" className="btn-primary btn-submit" disabled={isSubmitting}>
+                    {isSubmitting ? (
+                      <>
+                        <span>Sending...</span>
+                        <i className="fa-solid fa-spinner fa-spin"></i>
+                      </>
+                    ) : (
+                      <>
+                        <span>Send Message</span>
+                        <i className="fa-solid fa-paper-plane"></i>
+                      </>
+                    )}
                   </button>
                 </form>
               </div>
